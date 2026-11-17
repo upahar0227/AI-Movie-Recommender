@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Data and model caches
+data/raw/
+data/processed/
+data/web/
+data/app.db
+*.joblib
+
+# Next.js leftovers
+/node_modules
+/.next/
+/out/
+
+# misc
+.DS_Store
+*.pem
+.pptx-extract/
+
+# env
+.env*
+!.env.example
