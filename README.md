@@ -12,7 +12,7 @@ Put these files in `data/raw/`. They are not committed.
 | --- | --- |
 | `ml-latest-small/` (`ratings.csv`, `movies.csv`, `links.csv`) | [MovieLens latest small](https://grouplens.org/datasets/movielens/latest/) |
 | `tmdb_5000_movies.csv`, `tmdb_5000_credits.csv` | [TMDB 5000](https://www.kaggle.com/datasets/tmdb/tmdb-movie-metadata) |
-| `IMDB Dataset.csv` (`review`, `sentiment`) | [IMDb 50K reviews](https://www.kaggle.com/datasets/lakshmi25nathi/imdb-dataset-of-50k-movie-reviews) |
+| `IMDB Dataset.csv` (`review`, `sentiment`) | [IMDb 50K reviews](https://www.kaggle.com/datasets/lakshmi25npathi/imdb-dataset-of-50k-movie-reviews) |
 
 MovieLens may also sit directly in `data/raw/` instead of the `ml-latest-small` folder. Movies are kept only when `links.tmdbId` matches a TMDB id.
 
