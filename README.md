@@ -1,8 +1,83 @@
 # FlimFlex
 
-University research project: a content, collaborative, and hybrid movie ranker, with a review-sentiment model and a small web API. Metrics below are from `python -m src.recsys.train` on this machine. They are not hand-filled.
+AI-based movie recommendation system. University research project for COMP-5112-FB (Research Methodology), Lakehead University, by Upahar Bhandari and Anup Burlakoti.
 
-The run used Python 3.14.2. The code is the standard-library and PyData stack pinned in `requirements.txt` (the brief asked for 3.11). Random seed is 42.
+The project compares content-based, collaborative, hybrid, and sentiment-aware movie rankers, and delivers them in a small web application with accounts, ratings, a watchlist, and personalised recommendations. Metrics below are from `python -m src.recsys.train` on this machine. They are not hand-filled.
+
+The reported run used Python 3.14.2 with the packages pinned in `requirements.txt`. If a package fails to install, try the same Python version. The random seed is 42.
+
+## Features
+
+- Models: content-based (TF-IDF), item-kNN, SVD, a hybrid with adaptive weighting, and a review-sentiment classifier.
+- Evaluation: 5-fold per-user split, ranking and rating metrics, significance tests, and a cold-start experiment.
+- Web app: sign-up and login, genre onboarding, half-star ratings, a watchlist, My ratings, a community rating on every movie card, similar movies, and movie search.
+- Personalised Home: a blend of the long-term profile, recent activity, and recent searches, with stability rules and diversity re-ranking.
+- Genres can be changed from Home at any time.
+- Privacy controls: clear search history, delete one search, or delete the whole account.
+
+## Project structure
+
+```
+api/            FastAPI app (entry point api/main.py) and route modules
+src/recsys/     Models, training, evaluation, blending, posters, search profile
+src/app/        Database setup, ORM models, security, settings
+frontend/       Web page (plain HTML, CSS, and JavaScript, no build step)
+alembic/        Database migrations
+tests/          pytest tests
+results/        Metrics tables and plots written by training
+data/raw/       Datasets you download (not committed)
+```
+
+## Quick start
+
+These steps use Windows PowerShell. On Mac or Linux, use `python3` to create the environment and `source .venv/bin/activate` to activate it.
+
+1. Create and activate a virtual environment, then install the packages:
+
+   ```powershell
+   py -3 -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   ```
+
+2. Download the datasets into `data/raw/` (see the Data section).
+
+3. Create the settings file. Copy `.env.example` to `.env` and set `JWT_SECRET` to a long random string. You can make one with:
+
+   ```powershell
+   Copy-Item .env.example .env
+   python -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+
+   The API refuses to start without `JWT_SECRET`. Never commit `.env`.
+
+4. Train the models. This writes the files the app loads:
+
+   ```powershell
+   python -m src.recsys.train
+   ```
+
+5. Create the database tables:
+
+   ```powershell
+   python -m alembic upgrade head
+   ```
+
+6. Start the site and open http://127.0.0.1:8000 :
+
+   ```powershell
+   python -m uvicorn api.main:app --port 8000
+   ```
+
+7. Optional: run the tests with `python -m pytest`.
+
+Run step 5 again whenever you pull code that changes the database. A "no such table" error means the migration has not been applied.
+
+Training writes:
+
+- `data/processed/movies.csv`
+- `data/processed/artifacts/recommender.joblib`
+- `results/*.csv` and `results/*.png`
 
 ## Data
 
@@ -12,30 +87,19 @@ Put these files in `data/raw/`. They are not committed.
 | --- | --- |
 | `ml-latest-small/` (`ratings.csv`, `movies.csv`, `links.csv`) | [MovieLens latest small](https://grouplens.org/datasets/movielens/latest/) |
 | `tmdb_5000_movies.csv`, `tmdb_5000_credits.csv` | [TMDB 5000](https://www.kaggle.com/datasets/tmdb/tmdb-movie-metadata) |
-| `IMDB Dataset.csv` (`review`, `sentiment`) | [IMDb 50K reviews](https://www.kaggle.com/datasets/lakshmi25nathi/imdb-dataset-of-50k-movie-reviews) |
+| `IMDB Dataset.csv` (`review`, `sentiment`) | [IMDb 50K reviews](https://www.kaggle.com/datasets/lakshmi25npathi/imdb-dataset-of-50k-movie-reviews) |
 
 MovieLens may also sit directly in `data/raw/` instead of the `ml-latest-small` folder. Movies are kept only when `links.tmdbId` matches a TMDB id.
 
 This run kept **3537 movies** and **70194 ratings** (from 9742 MovieLens movies and 100836 ratings). The IMDb file has **50000** reviews and no movie ids, so it trains the sentiment classifier only.
 
-## Setup
-
-```bash
-py -3 -m pip install -r requirements.txt
-py -3 -m src.recsys.train
-py -3 -m pytest
-py -3 -m uvicorn api.main:app --port 8000
-```
-
-Training writes:
-
-- `data/processed/movies.csv`
-- `data/processed/artifacts/recommender.joblib`
-- `results/*.csv` and `results/*.png`
-
-Open http://127.0.0.1:8000 . The page searches titles, shows similar movies, and takes up to five ratings for a cold-start list. TMDB 5000 has no poster path, so the page uses a letter placeholder unless a poster URL is present.
-
 `TMDB_API_KEY` is optional. When it is unset, movie reception is a Bayesian average of MovieLens ratings (prior strength 20), scaled from the 0.5–5 range into 0–1. This run used that fallback. The code path that would average TMDB review sentiment is in `src/recsys/sentiment.py`.
+
+## Posters
+
+The TMDB 5000 file has no poster path. Posters are fetched by IMDb id from Metahub, cached under `data/processed/posters`, and served by `GET /posters/{imdb_id}`. When a poster is not available, the card shows a letter placeholder. Poster images are third-party content and are not stored in this repository.
+
+Known limitation: the Metahub host had an expired certificate when this was written, so the download retries without certificate verification for that one URL. Use this only for local demos. A production version should fetch posters through the TMDB images API with a TMDB key and remove the verification bypass.
 
 ## Community rating
 
@@ -56,6 +120,8 @@ Each user's ratings are split into 5 disjoint folds (seed 42). A movie a user ra
 The cold-start curve uses fold 0 only. 117 users who had at least 10 training ratings and a relevant test item were sampled (cap 120, seed 42). For 1, 3, 5, and 10 known ratings, only that subset is visible to the model.
 
 Paired tests compare each user's mean NDCG@10 for hybrid against each other model (Wilcoxon and paired t, alpha 0.05).
+
+The evaluation covers the base models above. The personalised blend on the Home page (recent activity and search) is not evaluated offline.
 
 ## Results from this run
 
@@ -101,16 +167,9 @@ Sentiment hold-out (10,000 reviews):
 
 Logistic-regression confusion matrix (rows are actual negative, positive): `[[4430, 570], [464, 4536]]`. The precision-recall curves are in `results/sentiment_pr.png`. The cold-start plot is `results/cold_start.png`.
 
-## Accounts
+## Accounts and personalised recommendations
 
-Copy `.env.example` to `.env` and set `JWT_SECRET` to a long random string. The API refuses to start without it. Then apply the tables and run the site:
-
-```bash
-py -3 -m alembic upgrade head
-py -3 -m uvicorn api.main:app --port 8000
-```
-
-Open http://127.0.0.1:8000 and create an account. The page keeps the access token in memory only. A new account picks genres first. With no ratings, `GET /recommendations/me` returns the highest-rated films in those genres (`mode` is `genre`). After the first rating the hybrid model is used. Under five ratings the mode is `warming_up`. At five or more it is `personalised`.
+The page keeps the access token in memory only. A new account picks genres first. With no ratings, `GET /recommendations/me` returns the highest-rated films in those genres (`mode` is `genre`). After the first rating the hybrid model is used. Under five ratings the mode is `warming_up`. At five or more it is `personalised`.
 
 Home mixes three scores, each scaled to 0–1:
 
@@ -122,27 +181,52 @@ Home mixes three scores, each scaled to 0–1:
 
 Ratings of 4 and above pull the content profile toward that film. Ratings of 2 and below push away from its genres, cast, and keywords. `CONTENT_DISLIKE_WEIGHT` in `src/recsys/config.py` is `0.5`. Clicks are not stored as ratings. `CLICK_SIGNAL_WEIGHT` is `0.15`. A submitted search is stored only in `search_events`: the query text, the normalised query, up to 10 matched movie ids, and the clicked movie id. Typing is not stored, and a search is never saved as a rating. The same normalised query inside 10 minutes updates that row instead of adding another. Recommendation responses do not include the query. Cards say "Based on your recent activity", or "Similar to {title}" when a result was clicked. Clear search history in the account menu, or call `DELETE /users/me/searches`, to delete those rows and rebuild the list.
 
+Stability rules keep the list from jumping after one action: movies in the previous list get a small bonus (`SNAPSHOT_BONUS = 0.05`), at most 40% of the top 10 can change at once (`CHURN_MAX_FRACTION = 0.40`), and results are re-ranked for diversity (`MMR_LAMBDA = 0.7`).
+
 ## Privacy
 
 The app stores an email, a username, a bcrypt password hash, movie ratings, a watchlist, interaction events (impression, click, rating, watchlist add), and submitted searches. A search row stores the query text, the matched movie ids, and the result that was clicked. It does not use third-party analytics. MovieLens files stay read-only. Delete one search or clear Search history on Home to drop that influence. Delete the account from the page, or call `DELETE /users/me` while signed in, to remove the user and every related row.
 
 ## API
 
+Open data and model routes:
+
 - `GET /health`
 - `GET /movies/search?q=`
 - `GET /recommendations/similar/{movie_id}?n=10`
 - `GET /recommendations/user/{user_id}?n=10`
 - `POST /recommendations/profile?n=10` with `{"ratings": [{"movie_id": 1, "rating": 5}]}`
+- `GET /posters/{imdb_id}`
+
+Accounts (sign in required for everything below `/auth`):
+
 - `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
 - `GET /users/me`, `DELETE /users/me`
-- `POST /ratings`, `GET /ratings/me`, `POST /watchlist/{movie_id}`, `GET /recommendations/me`
+
+Genres and onboarding:
+
+- `GET /genres` lists the allowed genres. `POST /genres` saves a first selection.
+- `GET /users/me/genres` returns the user's genres, the allowed list, and the maximum. `PUT /users/me/genres` replaces the selection.
+- `POST /onboarding` saves the first ratings and marks onboarding complete.
+
+Ratings, watchlist, and recommendations:
+
+- `POST /ratings`, `GET /ratings/me`, `DELETE /ratings/{movie_id}`
+- `POST /watchlist/{movie_id}`, `GET /watchlist/me`, `DELETE /watchlist/{movie_id}`
+- `GET /recommendations/me`
+- `POST /interactions` logs a click or similar event.
+
+Search history:
+
 - `POST /search/events`, `GET /users/me/searches`, `DELETE /users/me/searches/{id}`, `DELETE /users/me/searches`
 
 Unknown movies and users return 404. Ratings outside 0.5–5 return 422.
 
-## Manual checks for the star control
+## Tests and manual checks
 
-The page is plain HTML, so the star control is not run by pytest. After `py -3 -m uvicorn api.main:app --port 8000`:
+Run the automated tests with `python -m pytest`.
+
+The page is plain HTML, so the star control is not run by pytest. After starting the server, check these by hand:
 
 - Sign in, search for a title, and set 4.5 stars. The same film shows 4.5 on My ratings and on Recently rated.
 - Click those stars again, or Clear. The rating disappears.
@@ -150,12 +234,29 @@ The page is plain HTML, so the star control is not run by pytest. After `py -3 -
 - Sign out, search is behind the account form. A rating click before sign-in returns you to the form.
 - After a rating, the notice says recommendations are updating, then the rated film is gone from Recommended for you.
 
+## Troubleshooting
+
+- **`no such table: search_events` (or any missing table):** run `python -m alembic upgrade head`.
+- **API will not start, mentioning `JWT_SECRET`:** create `.env` from `.env.example` and set a long random `JWT_SECRET`.
+- **Port 8000 already in use:** an earlier server is still running. Stop it, or start on another port with `--port 8001` and add `http://127.0.0.1:8001` to `CORS_ORIGINS` in `.env`.
+- **Browser requests are blocked:** `CORS_ORIGINS` in `.env` must match the address and port you open. Use `127.0.0.1`, not `localhost`, unless you add it.
+- **Missing data file when training:** check the file names and folders in the Data section.
+- **Form data requires `python-multipart`:** it is pinned in `requirements.txt`. Run `pip install -r requirements.txt` again.
+
 ## Limitations
 
 - The test is offline. A hit is a held-out movie the user already rated 4 or higher, so the numbers are not online click rates.
+- The personalised blend (recent activity and search) is not evaluated offline.
 - Popularity bias remains. The popularity list touches about 1.5% of the catalog because the same films win for almost every user.
 - Only movies in both MovieLens and TMDB are kept, so a large part of MovieLens never enters the models.
 - IMDb reviews are not linked to these movies. Without `TMDB_API_KEY`, "sentiment" at movie level is a normalized Bayesian rating, not text from that movie.
 - Item-kNN has the best RMSE and the worst NDCG here. Its predicted stars sit near the user's mean, which is a weak ranking signal.
 - SVD is fit on raw ratings with no user or item bias, so its reconstructed values are a poor star prediction (RMSE 2.84) even though the ordering is competitive.
 - Hybrid parameters were tuned on one inner split, then frozen for all five folds.
+- Posters depend on a third-party host and use a certificate-verification bypass for that host (see Posters).
+
+## References and credits
+
+- Harper, F. M., & Konstan, J. A. (2015). The MovieLens datasets: History and context. ACM Transactions on Interactive Intelligent Systems, 5(4), Article 19.
+- Maas, A. L., Daly, R. E., Pham, P. T., Huang, D., Ng, A. Y., & Potts, C. (2011). Learning word vectors for sentiment analysis. Proceedings of ACL-HLT 2011, 142–150.
+- Movie metadata comes from the TMDB 5000 dataset on Kaggle, built from data from The Movie Database (TMDB). This project is not endorsed or certified by TMDB.
