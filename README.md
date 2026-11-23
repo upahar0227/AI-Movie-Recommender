@@ -257,6 +257,7 @@ The page is plain HTML, so the star control is not run by pytest. After starting
 
 ## References and credits
 
+- Shelake, V., Fernandes, S., & Shrungare, S. (2025). AI-driven personalized movie recommendations: A content and sentiment-aware model for streaming and digital   entrepreneurship. APTISI Transactions on Technopreneurship, 7(2), 306–317. 
 - Harper, F. M., & Konstan, J. A. (2015). The MovieLens datasets: History and context. ACM Transactions on Interactive Intelligent Systems, 5(4), Article 19.
 - Maas, A. L., Daly, R. E., Pham, P. T., Huang, D., Ng, A. Y., & Potts, C. (2011). Learning word vectors for sentiment analysis. Proceedings of ACL-HLT 2011, 142–150.
 - Movie metadata comes from the TMDB 5000 dataset on Kaggle, built from data from The Movie Database (TMDB). This project is not endorsed or certified by TMDB.
